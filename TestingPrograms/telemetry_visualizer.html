@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>6DOF Telemetry</title>
+<style>
+  :root {
+    --bg: #0a0d10;
+    --panel: #12171b;
+    --line: #232b30;
+    --amber: #ff9f1c;
+    --amber-dim: #7a5312;
+    --text: #d7dee2;
+    --text-dim: #6b7880;
+    --axis-x: #ff4d4d;
+    --axis-y: #4dff88;
+    --axis-z: #4d9fff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow: hidden;
+  }
+  #scene { position: absolute; inset: 0; }
+
+  #hud {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    width: 340px;
+    padding: 22px 20px;
+    background: linear-gradient(180deg, rgba(10,13,16,0.92), rgba(10,13,16,0.75));
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 18px;
+    pointer-events: none;
+    overflow-y: auto;
+  }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.18em; color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  h1 {
+    font-size: 18px; margin: 2px 0 0 0; font-weight: 600;
+    letter-spacing: 0.02em; color: var(--text);
+  }
+  #status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-dim);
+  }
+  #dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #3a4247; transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  #dot.live { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+
+  .group { display: flex; flex-direction: column; gap: 10px; }
+  .group-title {
+    font-size: 11px; letter-spacing: 0.12em; color: var(--text-dim);
+    border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .axis-row {
+    display: grid; grid-template-columns: 34px 1fr 52px;
+    align-items: center; gap: 10px; font-size: 12px;
+  }
+  .axis-label { color: var(--text-dim); }
+  .axis-label.x { color: var(--axis-x); }
+  .axis-label.y { color: var(--axis-y); }
+  .axis-label.z { color: var(--axis-z); }
+  .bar-track {
+    position: relative; height: 6px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 3px; overflow: hidden;
+  }
+  .bar-fill {
+    position: absolute; top: 0; bottom: 0; left: 50%;
+    background: var(--amber); width: 0%;
+  }
+  .axis-val { text-align: right; color: var(--text); font-size: 11px; }
+
+  .btn-row { display: flex; gap: 8px; }
+  .btn {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--panel);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--text-dim);
+  }
+  .btn.pressed { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+
+  #raw {
+    font-size: 10px; color: var(--text-dim); line-height: 1.6;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  #footer { margin-top: auto; font-size: 10px; color: var(--text-dim); line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div id="scene"></div>
+
+<div id="hud">
+  <div>
+    <div class="eyebrow">Space Mouse</div>
+    <h1>6DOF Telemetry</h1>
+  </div>
+
+  <div id="status"><div id="dot"></div><span id="status-text">no device detected</span></div>
+
+  <div class="group">
+    <div class="group-title">TRANSLATION</div>
+    <div class="axis-row"><span class="axis-label x">Tx</span><div class="bar-track"><div class="bar-fill" id="bar-0"></div></div><span class="axis-val" id="val-0">0.00</span></div>
+    <div class="axis-row"><span class="axis-label y">Ty</span><div class="bar-track"><div class="bar-fill" id="bar-1"></div></div><span class="axis-val" id="val-1">0.00</span></div>
+    <div class="axis-row"><span class="axis-label z">Tz</span><div class="bar-track"><div class="bar-fill" id="bar-2"></div></div><span class="axis-val" id="val-2">0.00</span></div>
+  </div>
+
+  <div class="group">
+    <div class="group-title">ROTATION</div>
+    <div class="axis-row"><span class="axis-label x">Rx</span><div class="bar-track"><div class="bar-fill" id="bar-4"></div></div><span class="axis-val" id="val-4">0.00</span></div>
+    <div class="axis-row"><span class="axis-label y">Ry</span><div class="bar-track"><div class="bar-fill" id="bar-5"></div></div><span class="axis-val" id="val-5">0.00</span></div>
+    <div class="axis-row"><span class="axis-label z">Rz</span><div class="bar-track"><div class="bar-fill" id="bar-3"></div></div><span class="axis-val" id="val-3">0.00</span></div>
+  </div>
+
+  <div class="group">
+    <div class="group-title">BUTTONS</div>
+    <div class="btn-row">
+      <div class="btn" id="btn-0">1</div>
+      <div class="btn" id="btn-1">2</div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-title">RAW GAMEPAD.AXES[]</div>
+    <div id="raw">waiting for device...</div>
+  </div>
+
+  <div id="footer">
+    Move/tilt the knob to wake the browser's Gamepad API.<br>
+    If rotation looks mapped to the wrong axis, the raw values<br>
+    above show the true index order your browser reports.
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+  // ---- Three.js scene ----
+  const container = document.getElementById('scene');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0d10);
+  scene.fog = new THREE.Fog(0x0a0d10, 6, 16);
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(3.2, 2.4, 4.2);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  container.appendChild(renderer.domElement);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // grid floor for depth reference
+  const grid = new THREE.GridHelper(10, 20, 0x1c2328, 0x161c20);
+  grid.position.y = -1.4;
+  scene.add(grid);
+
+  scene.add(new THREE.AmbientLight(0x404040, 1.2));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(3, 5, 2);
+  scene.add(dirLight);
+
+  // the cube: neutral faces, axis-colored edges (standard X=red Y=green Z=blue convention)
+  const cubeGroup = new THREE.Group();
+  scene.add(cubeGroup);
+
+  const geo = new THREE.BoxGeometry(1.4, 1.4, 1.4);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x1b2126, roughness: 0.6, metalness: 0.2 });
+  const cube = new THREE.Mesh(geo, mat);
+  cubeGroup.add(cube);
+
+  const edges = new THREE.EdgesGeometry(geo);
+  const edgeLines = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x3a444b }));
+  cubeGroup.add(edgeLines);
+
+  // axis gizmo lines through the cube center
+  function axisLine(dir, color) {
+    const points = [dir.clone().multiplyScalar(-1.05), dir.clone().multiplyScalar(1.05)];
+    const g = new THREE.BufferGeometry().setFromPoints(points);
+    return new THREE.Line(g, new THREE.LineBasicMaterial({ color, linewidth: 2 }));
+  }
+  cubeGroup.add(axisLine(new THREE.Vector3(1, 0, 0), 0xff4d4d));
+  cubeGroup.add(axisLine(new THREE.Vector3(0, 1, 0), 0x4dff88));
+  cubeGroup.add(axisLine(new THREE.Vector3(0, 0, 1), 0x4d9fff));
+
+  // ---- Gamepad polling + axis mapping ----
+  // TinyUSB TUD_HID_REPORT_DESC_GAMEPAD() reports axes in this order:
+  //   0:X  1:Y  2:Z  3:Rz  4:Rx  5:Ry
+  const AXIS_IDX = { tx: 0, ty: 1, tz: 2, rz: 3, rx: 4, ry: 5 };
+
+  let gpIndex = null;
+  window.addEventListener('gamepadconnected', (e) => { gpIndex = e.gamepad.index; });
+  window.addEventListener('gamepaddisconnected', () => { gpIndex = null; });
+
+  const target = { tx: 0, ty: 0, tz: 0, rx: 0, ry: 0, rz: 0 };
+  const current = { tx: 0, ty: 0, tz: 0, rx: 0, ry: 0, rz: 0 };
+
+  function setBar(id, v) {
+    const fill = document.getElementById('bar-' + id);
+    const pct = Math.max(-100, Math.min(100, v * 100));
+    fill.style.width = Math.abs(pct) / 2 + '%';
+    fill.style.left = pct >= 0 ? '50%' : (50 + pct / 2) + '%';
+  }
+
+  function tick() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let gp = null;
+    if (gpIndex !== null) gp = pads[gpIndex];
+    if (!gp) gp = Array.from(pads).find(p => p);
+
+    const dot = document.getElementById('dot');
+    const statusText = document.getElementById('status-text');
+
+    if (gp) {
+      dot.classList.add('live');
+      statusText.textContent = gp.id || 'device connected';
+
+      const a = gp.axes;
+      target.tx = a[AXIS_IDX.tx] || 0;
+      target.ty = a[AXIS_IDX.ty] || 0;
+      target.tz = a[AXIS_IDX.tz] || 0;
+      target.rz = a[AXIS_IDX.rz] || 0;
+      target.rx = a[AXIS_IDX.rx] || 0;
+      target.ry = a[AXIS_IDX.ry] || 0;
+
+      document.getElementById('raw').textContent =
+        a.map((v, i) => `[${i}] ${v.toFixed(3)}`).join('\n');
+
+      document.getElementById('btn-0').classList.toggle('pressed', !!(gp.buttons[0] && gp.buttons[0].pressed));
+      document.getElementById('btn-1').classList.toggle('pressed', !!(gp.buttons[1] && gp.buttons[1].pressed));
+    } else {
+      dot.classList.remove('live');
+      statusText.textContent = 'no device detected';
+      document.getElementById('raw').textContent = 'waiting for device...';
+    }
+
+    // smooth toward target for a less jittery visual
+    const lerp = 0.25;
+    for (const k in target) current[k] += (target[k] - current[k]) * lerp;
+
+    // update HUD bars/numbers
+    setBar(0, current.tx); document.getElementById('val-0').textContent = current.tx.toFixed(2);
+    setBar(1, current.ty); document.getElementById('val-1').textContent = current.ty.toFixed(2);
+    setBar(2, current.tz); document.getElementById('val-2').textContent = current.tz.toFixed(2);
+    setBar(3, current.rz); document.getElementById('val-3').textContent = current.rz.toFixed(2);
+    setBar(4, current.rx); document.getElementById('val-4').textContent = current.rx.toFixed(2);
+    setBar(5, current.ry); document.getElementById('val-5').textContent = current.ry.toFixed(2);
+
+    // drive the cube: translation (small range) + rotation
+    cubeGroup.position.x = current.tx * 1.2;
+    cubeGroup.position.y = -current.tz * 1.2; // Tz (in/out on the knob) reads as vertical lift
+    cubeGroup.position.z = current.ty * 1.2;
+
+    cubeGroup.rotation.x = current.rx * 1.6;
+    cubeGroup.rotation.y = current.ry * 1.6;
+    cubeGroup.rotation.z = current.rz * 1.6;
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  }
+
+  tick();
+</script>
+</body>
+</html>
