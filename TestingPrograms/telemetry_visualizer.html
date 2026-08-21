@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>6DOF Telemetry</title>
 <style>
-  
   :root {
     --bg: #0a0d10;
     --panel: #12171b;
@@ -16,6 +15,24 @@
     --axis-x: #ff4d4d;
     --axis-y: #4dff88;
     --axis-z: #4d9fff;
+    --grid-major: #1c2328;
+    --grid-minor: #161c20;
+    --scene-bg: #0a0d10;
+  }
+  html[data-theme="light"] {
+    --bg: #f4f1ea;
+    --panel: #ffffff;
+    --line: #d8d2c4;
+    --amber: #b8630a;
+    --amber-dim: #f0d4ad;
+    --text: #24211a;
+    --text-dim: #6e6a5c;
+    --axis-x: #c93b3b;
+    --axis-y: #1f8f4e;
+    --axis-z: #2064c9;
+    --grid-major: #e2ddd0;
+    --grid-minor: #ece8dd;
+    --scene-bg: #f4f1ea;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -23,8 +40,20 @@
     color: var(--text);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     overflow: hidden;
+    transition: background 0.25s ease, color 0.25s ease;
   }
   #scene { position: absolute; inset: 0; }
+
+  #theme-toggle {
+    position: absolute; top: 20px; right: 20px;
+    width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel);
+    color: var(--text-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+  #theme-toggle:hover { border-color: var(--amber); color: var(--amber); }
 
   #hud {
     position: absolute; top: 0; left: 0; bottom: 0;
@@ -91,12 +120,19 @@
     font-size: 10px; color: var(--text-dim); line-height: 1.6;
     white-space: pre-wrap; word-break: break-all;
   }
+  #live-values {
+    font-size: 11px; line-height: 1.9;
+    display: grid; grid-template-columns: 30px 1fr; gap: 2px 8px;
+  }
+  #live-values .lv-label { color: var(--text-dim); }
+  #live-values .lv-value { color: var(--text); text-align: right; }
   #footer { margin-top: auto; font-size: 10px; color: var(--text-dim); line-height: 1.6; }
 </style>
 </head>
 <body>
 
 <div id="scene"></div>
+<button id="theme-toggle" title="Toggle light/dark">&#9789;</button>
 
 <div id="hud">
   <div>
@@ -121,6 +157,18 @@
   </div>
 
   <div class="group">
+    <div class="group-title">LIVE VALUES</div>
+    <div id="live-values">
+      <span class="lv-label">Tx</span><span class="lv-value" id="lv-tx">0.000</span>
+      <span class="lv-label">Ty</span><span class="lv-value" id="lv-ty">0.000</span>
+      <span class="lv-label">Tz</span><span class="lv-value" id="lv-tz">0.000</span>
+      <span class="lv-label">Rx</span><span class="lv-value" id="lv-rx">0.000</span>
+      <span class="lv-label">Ry</span><span class="lv-value" id="lv-ry">0.000</span>
+      <span class="lv-label">Rz</span><span class="lv-value" id="lv-rz">0.000</span>
+    </div>
+  </div>
+
+  <div class="group">
     <div class="group-title">BUTTONS</div>
     <div class="btn-row">
       <div class="btn" id="btn-0">1</div>
@@ -142,6 +190,30 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+  // ---- Theme toggle ----
+  function themeColor(varName) {
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.getElementById('theme-toggle').textContent = theme === 'light' ? '\u2600' : '\u263D';
+    // re-read CSS vars now that the attribute changed, then push into the 3D scene
+    const bg = new THREE.Color(themeColor('--scene-bg'));
+    scene.background = bg;
+    scene.fog.color = bg;
+    if (Array.isArray(grid.material)) {
+      grid.material[0].color = new THREE.Color(themeColor('--grid-major'));
+      grid.material[1].color = new THREE.Color(themeColor('--grid-minor'));
+    }
+  }
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    localStorage.setItem('telemetry-theme', next);
+    applyTheme(next);
+  });
+
   // ---- Three.js scene ----
   const container = document.getElementById('scene');
   const scene = new THREE.Scene();
@@ -167,6 +239,8 @@
   const grid = new THREE.GridHelper(10, 20, 0x1c2328, 0x161c20);
   grid.position.y = -1.4;
   scene.add(grid);
+
+  applyTheme(localStorage.getItem('telemetry-theme') || 'dark');
 
   scene.add(new THREE.AmbientLight(0x404040, 1.2));
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -258,6 +332,14 @@
     setBar(3, current.rz); document.getElementById('val-3').textContent = current.rz.toFixed(2);
     setBar(4, current.rx); document.getElementById('val-4').textContent = current.rx.toFixed(2);
     setBar(5, current.ry); document.getElementById('val-5').textContent = current.ry.toFixed(2);
+
+    // formatted live-values readout (higher precision than the bar labels)
+    document.getElementById('lv-tx').textContent = current.tx.toFixed(3);
+    document.getElementById('lv-ty').textContent = current.ty.toFixed(3);
+    document.getElementById('lv-tz').textContent = current.tz.toFixed(3);
+    document.getElementById('lv-rx').textContent = current.rx.toFixed(3);
+    document.getElementById('lv-ry').textContent = current.ry.toFixed(3);
+    document.getElementById('lv-rz').textContent = current.rz.toFixed(3);
 
     // drive the cube: translation (small range) + rotation
     cubeGroup.position.x = current.tx * 1.2;
