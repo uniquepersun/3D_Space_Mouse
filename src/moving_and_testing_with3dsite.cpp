@@ -30,9 +30,15 @@ float off3x, off3y, off3z;
 
 // ---------------------------------------------------------------------
 // Tuning constants (ported from the Thonny test script / Config.h)
+//
+// Gains bumped ~4x from the original disc-magnet defaults - cuboid
+// magnets push a much stronger raw field, so a bigger divisor is
+// needed to stop a tiny nudge from slamming straight to max output.
+// Retune by feel: raise further if it still maxes out on a small
+// movement, lower if it now feels sluggish/unresponsive.
 // ---------------------------------------------------------------------
-const float GAIN_T[3]   = {28.0, 28.0, 24.0};   // Tx, Ty, Tz
-const float GAIN_R[3]   = {18.0, 18.0, 20.0};   // Rx, Ry, Rz
+const float GAIN_T[3]   = {180.0, 180.0, 165.0};  // Tx, Ty, Tz
+const float GAIN_R[3]   = {140.0, 140.0, 150.0};    // Rx, Ry, Rz
 const int   SIGN_AXIS[6] = {-1, 1, -1, 1, 1, 1};
 const float DEAD_T = 16.0;
 const float DEAD_R = 20.0;
