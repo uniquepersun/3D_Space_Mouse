@@ -206,6 +206,30 @@ bool initSensor(Adafruit_MLX90393 &s, uint8_t addr) {
   return true;
 }
 
+void calibrate() {
+  const int CAL_SAMPLES = 50;
+  float sum1x = 0, sum1y = 0, sum1z = 0;
+  float sum2x = 0, sum2y = 0, sum2z = 0;
+  float sum3x = 0, sum3y = 0, sum3z = 0;
+
+  Serial.println("Calibrating - keep the knob still...");
+  delay(300);  // let the knob finish settling before sampling starts
+
+  for (int i = 0; i < CAL_SAMPLES; i++) {
+    float x, y, z;
+    mag1.readData(&x, &y, &z); sum1x += x; sum1y += y; sum1z += z;
+    mag2.readData(&x, &y, &z); sum2x += x; sum2y += y; sum2z += z;
+    mag3.readData(&x, &y, &z); sum3x += x; sum3y += y; sum3z += z;
+    delay(10);
+  }
+
+  off1x = sum1x / CAL_SAMPLES; off1y = sum1y / CAL_SAMPLES; off1z = sum1z / CAL_SAMPLES;
+  off2x = sum2x / CAL_SAMPLES; off2y = sum2y / CAL_SAMPLES; off2z = sum2z / CAL_SAMPLES;
+  off3x = sum3x / CAL_SAMPLES; off3y = sum3y / CAL_SAMPLES; off3z = sum3z / CAL_SAMPLES;
+
+  Serial.println("Calibration done.");
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -223,17 +247,27 @@ void setup() {
     Serial.println("One or more sensors failed to init - check wiring/addresses.");
   }
 
-  // Calibrate: keep the knob still during boot
-  delay(200);
-  mag1.readData(&off1x, &off1y, &off1z);
-  mag2.readData(&off2x, &off2y, &off2z);
-  mag3.readData(&off3x, &off3y, &off3z);
+  // Calibrate: keep the knob completely still during boot.
+  // Averaging many samples (instead of one single reading) matters a
+  // lot more now than it did with discs - cuboid magnets give a much
+  // stronger, less symmetric field, so a single sample caught at a
+  // slightly different knob position/settling moment can bake in a
+  // large, bad offset that then pushes every later reading out of
+  // range. Averaging ~50 samples over ~500ms smooths that out.
+  calibrate();
 
   last_t = millis();
   lastNudgeTime = millis();
 }
 
 void loop() {
+  // Type 'c' + Enter in Serial Monitor to recalibrate without a power
+  // cycle - useful if the knob wasn't fully at rest during boot and
+  // the offset baked in a bad baseline.
+  if (Serial.available() && Serial.read() == 'c') {
+    calibrate();
+  }
+
   float raw_x1, raw_y1, raw_z1, raw_x2, raw_y2, raw_z2, raw_x3, raw_y3, raw_z3;
   bool ok1 = mag1.readData(&raw_x1, &raw_y1, &raw_z1);
   bool ok2 = mag2.readData(&raw_x2, &raw_y2, &raw_z2);
