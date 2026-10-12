@@ -39,7 +39,10 @@ float off3x, off3y, off3z;
 // ---------------------------------------------------------------------
 const float GAIN_T[3]   = {280.0, 280.0, 265.0};  // Tx, Ty, Tz
 const float GAIN_R[3]   = {240.0, 240.0, 250.0};  // Rx, Ry, Rz
-const int   SIGN_AXIS[6] = {-1, 1, -1, 1, 1, 1};
+// Rz flipped (was +1) - physical clockwise twist was coming out as
+// counter-clockwise rotation in the visualizer. Pure sign fix - gains,
+// calibration, and demo logic below are untouched from your working copy.
+const int   SIGN_AXIS[6] = {-1, 1, -1, 1, 1, -1};
 const float DEAD_T = 16.0;
 const float DEAD_R = 20.0;
 const float SMOOTH_TAU_S = 0.08;
