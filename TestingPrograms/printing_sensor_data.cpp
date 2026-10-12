@@ -147,7 +147,7 @@ void loop() {
   report.ry = clamp_to_int8(smoothed[4] * OUTPUT_SCALE);
   report.rz = clamp_to_int8(smoothed[5] * OUTPUT_SCALE);
   report.hat = 0;
-  // TODO: wire the 2 side buttons to GPIO pins and read them here.
+  
   report.buttons = 0;
 
   if (usb_hid.ready()) {
